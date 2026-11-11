@@ -1,0 +1,162 @@
+# ============================================================================
+#  ChunkHopper - configuration
+#
+#  Couleurs / formats acceptes PARTOUT (noms, lores, titre, messages) :
+#    - codes classiques : &c  &b  &l  &r ...
+#    - hexa             : &#ff8800
+#    - MiniMessage      : <red>  <#ff8800>  <gradient:red:gold>texte</gradient>  <bold>
+#
+#  Items : un Material (HOPPER, GOLD_INGOT...) OU un item Nexo : nexo:mon_item
+#  Options d'un item : item, name, lore, amount, glow (true/false), hide-flags (true/false)
+#
+#  Placeholders : {level} {level_roman} {next_level} {next_level_roman} {max_level}
+#                 {speed} {next_speed} {price} {balance} {missing}
+# ============================================================================
+
+# Intervalle (en ticks) entre deux aspirations des items au sol. 20 ticks = 1 seconde.
+collect-interval-ticks: 5
+
+# Nombre max de Chunk Hoppers par chunk (0 = illimite).
+max-per-chunk: 0
+
+# true  = le niveau est conserve quand on casse le hopper
+# false = le hopper recasse redevient niveau 1
+keep-level-on-break: true
+
+# Conteneurs vers lesquels un hopper ameliore transfere plusieurs items d'un coup.
+# (types d'inventaire Bukkit)
+upgraded-transfer-targets: [CHEST, BARREL, SHULKER_BOX, HOPPER, DROPPER, DISPENSER]
+
+# ----------------------------------------------------------------------------
+# Niveaux
+#   speed = nombre d'items deplaces a chaque transfert (le cooldown vanilla de 8 ticks reste)
+#   price = prix (Vault) pour ATTEINDRE ce niveau. Le niveau 1 est le niveau de base.
+#   Tu peux ajouter / retirer des niveaux (numerotation continue : 1, 2, 3, ...).
+# ----------------------------------------------------------------------------
+levels:
+  1:
+    speed: 1
+    price: 0
+  2:
+    speed: 2
+    price: 5000
+  3:
+    speed: 4
+    price: 15000
+  4:
+    speed: 8
+    price: 40000
+  5:
+    speed: 16
+    price: 100000
+  6:
+    speed: 32
+    price: 250000
+  7:
+    speed: 64
+    price: 600000
+
+# Apparence de l'item Chunk Hopper.
+item:
+  name: "&6&lChunk Hopper &e(Niveau {level_roman})"
+  lore:
+    - "&7Aspire tous les items tombes"
+    - "&7dans le chunk ou il est pose."
+    - ""
+    - "&7Vitesse : &e{speed} &7item(s) par transfert"
+    - "&8Maj + clic droit (main vide) pour l'ameliorer"
+
+# Sons (cles Minecraft, vide = aucun son)
+sounds:
+  upgrade: "entity.player.levelup"
+  error: "entity.villager.no"
+
+# ----------------------------------------------------------------------------
+# Menu d'amelioration
+#   trigger : SNEAK_RIGHT_CLICK = maj + clic droit sur le hopper, main vide
+#             RIGHT_CLICK       = clic droit (maj + clic droit ouvre l'inventaire normal)
+#   rows    : nombre de lignes (1 a 6)
+#   Chaque item a : slot: 13   ou   slots: [0, 1, 2, "9-17"]
+#
+#   Items speciaux (leur nom de section compte) :
+#     upgrade          bouton d'amelioration, quand le joueur a assez d'argent
+#     upgrade-no-money meme bouton quand il n'a pas assez d'argent
+#     max-level        affiche a la place du bouton quand le niveau max est atteint
+#     close            ferme le menu au clic
+#     filler           remplit tous les slots restes vides (enabled: false pour desactiver)
+#   Toute autre section (ex: decoration-1) est un simple item decoratif.
+# ----------------------------------------------------------------------------
+menu:
+  title: "&8Amelioration &7- &6Chunk Hopper"
+  rows: 3
+  trigger: SNEAK_RIGHT_CLICK
+  items:
+    filler:
+      enabled: true
+      item: BLACK_STAINED_GLASS_PANE
+      name: " "
+
+    info:
+      slot: 11
+      item: HOPPER
+      name: "&6&lChunk Hopper"
+      lore:
+        - ""
+        - "&7Niveau actuel : &e{level_roman} &8({level}/{max_level})"
+        - "&7Vitesse : &e{speed} &7item(s) par transfert"
+        - ""
+        - "&7Ton solde : &a{balance}"
+
+    upgrade:
+      slot: 15
+      item: LIME_DYE            # exemple Nexo : nexo:bouton_ameliorer
+      name: "&a&lAmeliorer"
+      glow: true
+      lore:
+        - ""
+        - "&7Niveau &e{level_roman} &7-> &a{next_level_roman}"
+        - "&7Vitesse : &e{speed} &7-> &a{next_speed} &7item(s)"
+        - ""
+        - "&7Prix : &6{price}"
+        - ""
+        - "&eClique pour ameliorer !"
+
+    upgrade-no-money:
+      slot: 15
+      item: RED_DYE
+      name: "&c&lFonds insuffisants"
+      lore:
+        - ""
+        - "&7Niveau &e{level_roman} &7-> &a{next_level_roman}"
+        - "&7Vitesse : &e{speed} &7-> &a{next_speed} &7item(s)"
+        - ""
+        - "&7Prix : &6{price}"
+        - "&cIl te manque : &6{missing}"
+
+    max-level:
+      slot: 15
+      item: NETHER_STAR
+      name: "&b&lNiveau maximum"
+      glow: true
+      lore:
+        - ""
+        - "&7Ton Chunk Hopper est au niveau max."
+        - "&7Vitesse : &e{speed} &7item(s) par transfert"
+
+    close:
+      slot: 22
+      item: BARRIER
+      name: "&cFermer"
+
+messages:
+  max-reached: "&cIl y a deja trop de Chunk Hoppers dans ce chunk."
+  given: "&aTu as donne {amount} Chunk Hopper(s) niveau {level_roman} a {player}."
+  usage: "&cUsage : /chunkhopper give <joueur> [quantite] [niveau]  |  /chunkhopper reload"
+  unknown-player: "&cJoueur introuvable."
+  reloaded: "&aConfiguration rechargee."
+  no-permission: "&cTu n'as pas la permission d'ameliorer ce hopper."
+  no-economy: "&cAucune economie (Vault) detectee : amelioration impossible."
+  no-money: "&cIl te manque &6{missing} &cpour ameliorer ton Chunk Hopper."
+  max-level: "&cTon Chunk Hopper est deja au niveau maximum."
+  hopper-gone: "&cCe Chunk Hopper n'existe plus."
+  upgraded: "&aChunk Hopper ameliore au niveau &e{level_roman} &7({speed} item(s) par transfert)&a !"

@@ -1,0 +1,21 @@
+name: ChunkHopper
+version: '${project.version}'
+main: fr.chunkhopper.ChunkHopperPlugin
+api-version: '26.2'
+description: Hopper qui aspire tous les items tombes dans son chunk
+softdepend: [Vault, Nexo]
+commands:
+  chunkhopper:
+    description: Gestion des Chunk Hoppers
+    usage: /<command> give <joueur> [quantite] [niveau] | reload
+    aliases: [chopper]
+permissions:
+  chunkhopper.give:
+    description: Permet de donner des Chunk Hoppers
+    default: op
+  chunkhopper.reload:
+    description: Permet de recharger la config
+    default: op
+  chunkhopper.upgrade:
+    description: Permet d'ouvrir le menu d'amelioration et d'ameliorer un Chunk Hopper
+    default: true
