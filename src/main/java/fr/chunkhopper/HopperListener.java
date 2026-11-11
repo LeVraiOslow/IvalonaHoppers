@@ -118,7 +118,7 @@ public final class HopperListener implements Listener {
         if (!plugin.isTransferTarget(destination.getType())) return;
 
         event.setCancelled(true);
-        plugin.transfer(source, destination, speed);
+        plugin.scheduleTransfer(source, destination, speed);
     }
 
     @EventHandler

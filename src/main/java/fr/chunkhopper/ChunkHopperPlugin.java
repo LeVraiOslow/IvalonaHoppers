@@ -26,6 +26,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
@@ -307,34 +308,80 @@ public final class ChunkHopperPlugin extends JavaPlugin implements TabExecutor {
         ChunkKey ck = keyOf(block);
         Map<BlockPos, Integer> map = hoppers.get(ck);
         if (map == null) return;
-        map.remove(new BlockPos(block.getX(), block.getY(), block.getZ()));
+        BlockPos pos = new BlockPos(block.getX(), block.getY(), block.getZ());
+        map.remove(pos);
+        lastTransfer.remove(pos);
+        pendingTransfers.remove(pos);
         if (map.isEmpty()) hoppers.remove(ck);
     }
 
     // -------------------------------------------------------------- transfer
 
+    /** Delai minimal (ticks) entre deux transferts d'un meme hopper, comme le cooldown vanilla. */
+    private static final long TRANSFER_COOLDOWN_TICKS = 8L;
+
+    /** Hoppers dont un transfert est deja programme (evite les doublons). */
+    private final Set<BlockPos> pendingTransfers = new HashSet<>();
+    /** Dernier tick (temps de jeu du monde) ou un hopper a transfere. */
+    private final Map<BlockPos, Long> lastTransfer = new HashMap<>();
+
     /**
-     * Deplace jusqu'a {@code budget} items de source vers destination.
-     * Seul ce que la destination accepte vraiment est retire de la source (pas de duplication).
+     * Programme un transfert de {@code budget} items au tick suivant.
+     *
+     * Pourquoi differer ? Pendant InventoryMoveItemEvent, Paper reduit temporairement le slot
+     * du hopper a 1 item (le vrai nombre est restaure APRES l'annulation de l'evenement).
+     * Lire ou modifier le slot dans l'evenement fausse donc les quantites : on deplacait 1 item
+     * puis on supprimait tout le slot. En attendant le tick suivant, le slot a retrouve son
+     * contenu reel et le transfert est exact.
      */
+    public void scheduleTransfer(Inventory source, Inventory destination, int budget) {
+        Location loc = source.getLocation();
+        if (loc == null || loc.getWorld() == null) return;
+        World world = loc.getWorld();
+        BlockPos pos = new BlockPos(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
+
+        if (pendingTransfers.contains(pos)) return;
+        long now = world.getGameTime();
+        Long last = lastTransfer.get(pos);
+        if (last != null && now - last < TRANSFER_COOLDOWN_TICKS) return;
+        pendingTransfers.add(pos);
+
+        getServer().getScheduler().runTask(this, () -> {
+            pendingTransfers.remove(pos);
+            // Le hopper doit toujours exister et etre un Chunk Hopper.
+            if (!world.isChunkLoaded(pos.x() >> 4, pos.z() >> 4)) return;
+            if (world.getBlockAt(pos.x(), pos.y(), pos.z()).getType() != Material.HOPPER) return;
+            if (levelAt(world.getUID(), pos.x(), pos.y(), pos.z()) <= 0) return;
+
+            lastTransfer.put(pos, world.getGameTime());
+            transfer(source, destination, budget);
+        });
+    }
+
+    /** Deplace jusqu'a {@code budget} items de source vers destination, sans jamais en perdre. */
     public void transfer(Inventory source, Inventory destination, int budget) {
         for (int i = 0; i < source.getSize() && budget > 0; i++) {
             ItemStack stack = source.getItem(i);
             if (stack == null || stack.getType().isAir() || stack.getAmount() <= 0) continue;
 
-            int take = Math.min(budget, stack.getAmount());
+            int have = stack.getAmount();
+            int take = Math.min(budget, have);
             ItemStack toMove = stack.clone();
             toMove.setAmount(take);
+
             Map<Integer, ItemStack> left = destination.addItem(toMove);
-            int leftover = left.isEmpty() ? 0 : left.get(0).getAmount();
+            int leftover = 0;
+            for (ItemStack rest : left.values()) leftover += rest.getAmount();
             int moved = take - leftover;
             if (moved <= 0) continue;
 
-            if (moved >= stack.getAmount()) {
+            // On retire exactement ce qui est entre dans la destination, rien de plus.
+            int remaining = have - moved;
+            if (remaining <= 0) {
                 source.setItem(i, null);
             } else {
                 ItemStack rest = stack.clone();
-                rest.setAmount(stack.getAmount() - moved);
+                rest.setAmount(remaining);
                 source.setItem(i, rest);
             }
             budget -= moved;
