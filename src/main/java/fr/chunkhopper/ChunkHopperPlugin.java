@@ -50,6 +50,7 @@ public final class ChunkHopperPlugin extends JavaPlugin implements TabExecutor {
     private final TreeMap<Integer, LevelData> levels = new TreeMap<>();
     private final Set<InventoryType> transferTargets = EnumSet.noneOf(InventoryType.class);
     private VaultHook vault;
+    private RoseStackerHook roseStacker;
 
     /** Index des Chunk Hoppers (avec leur niveau) dans les chunks charges. */
     private final Map<ChunkKey, Map<BlockPos, Integer>> hoppers = new HashMap<>();
@@ -66,6 +67,8 @@ public final class ChunkHopperPlugin extends JavaPlugin implements TabExecutor {
         } else {
             getLogger().warning("Vault est absent : les ameliorations payantes sont desactivees.");
         }
+
+        roseStacker = RoseStackerHook.create(this);
 
         getServer().getPluginManager().registerEvents(new HopperListener(this), this);
         getServer().getPluginManager().registerEvents(new MenuListener(), this);
@@ -426,24 +429,52 @@ public final class ChunkHopperPlugin extends JavaPlugin implements TabExecutor {
             for (Entity entity : chunk.getEntities()) {
                 if (!(entity instanceof Item item) || !item.isValid()) continue;
 
-                ItemStack original = item.getItemStack();
-                ItemStack remaining = original.clone();
-                for (Inventory inventory : inventories) {
-                    Map<Integer, ItemStack> left = inventory.addItem(remaining);
-                    if (left.isEmpty()) {
-                        remaining = null;
-                        break;
-                    }
-                    remaining = left.get(0);
-                }
+                // Vraie quantite du tas (RoseStacker : peut etre 1000+, bien au-dela d'un stack).
+                int total = roseStacker != null ? roseStacker.amountOf(item) : item.getItemStack().getAmount();
+                if (total <= 0) continue;
 
-                if (remaining == null) {
-                    item.remove();
-                } else if (remaining.getAmount() != original.getAmount()) {
-                    item.setItemStack(remaining);
+                // On ne prend QUE ce qui rentre dans les hoppers ; le reste reste au sol.
+                int moved = insertInto(inventories, item.getItemStack(), total);
+                if (moved <= 0) continue;
+
+                int remaining = total - moved;
+                if (remaining <= 0) {
+                    if (roseStacker != null) roseStacker.remove(item);
+                    else item.remove();
+                } else if (roseStacker != null) {
+                    roseStacker.setAmount(item, remaining);
+                } else {
+                    ItemStack rest = item.getItemStack();
+                    rest.setAmount(remaining);
+                    item.setItemStack(rest);
                 }
             }
         }
+    }
+
+    /**
+     * Insere jusqu'a {@code amount} items du type de {@code template} dans les inventaires.
+     * Retourne la quantite REELLEMENT inseree (jamais plus que la place disponible).
+     */
+    private int insertInto(List<Inventory> inventories, ItemStack template, int amount) {
+        int maxStack = Math.max(1, template.getMaxStackSize());
+        int left = amount;
+        for (Inventory inventory : inventories) {
+            while (left > 0) {
+                int chunkSize = Math.min(left, maxStack);
+                ItemStack toInsert = template.clone();
+                toInsert.setAmount(chunkSize);
+
+                int notInserted = 0;
+                for (ItemStack rest : inventory.addItem(toInsert).values()) notInserted += rest.getAmount();
+
+                int inserted = chunkSize - notInserted;
+                left -= inserted;
+                if (notInserted > 0 || inserted <= 0) break; // cet inventaire est plein
+            }
+            if (left <= 0) break;
+        }
+        return amount - left;
     }
 
     // --------------------------------------------------------------- command
