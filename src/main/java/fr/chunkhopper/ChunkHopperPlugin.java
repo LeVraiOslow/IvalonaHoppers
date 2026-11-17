@@ -439,8 +439,9 @@ public final class ChunkHopperPlugin extends JavaPlugin implements TabExecutor {
 
                 int remaining = total - moved;
                 if (remaining <= 0) {
+                    // Tout a ete pris : l'entite doit disparaitre, quoi qu'il arrive (anti-duplication).
                     if (roseStacker != null) roseStacker.remove(item);
-                    else item.remove();
+                    item.remove();
                 } else if (roseStacker != null) {
                     roseStacker.setAmount(item, remaining);
                 } else {

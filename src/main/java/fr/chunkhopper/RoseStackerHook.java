@@ -82,13 +82,18 @@ public final class RoseStackerHook {
         item.setItemStack(stack);
     }
 
-    /** Supprime completement l'entite (et son tas RoseStacker). */
+    /**
+     * Supprime completement l'entite (et son tas RoseStacker).
+     *
+     * removeItemStack() ne fait que retirer le tas du registre de RoseStacker : l'entite Item
+     * reste dans le monde. Elle devenait alors un item vanilla ordinaire, re-ramasse au passage
+     * suivant (d'ou la duplication x2). On supprime donc TOUJOURS l'entite en plus.
+     */
     public void remove(Item item) {
         Object stacked = stackedOf(item);
         if (stacked != null) {
             try {
                 removeItemStack.invoke(api, stacked);
-                return;
             } catch (Throwable t) {
                 warn(t);
             }
